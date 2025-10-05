@@ -145,6 +145,11 @@ body {
     gap: 1rem;
 }
 
+.messages.hide-summaries .session-entry.summary,
+.messages.hide-system .session-entry.system {
+    display: none;
+}
+
 /* Scrollbar customizada */
 .messages::-webkit-scrollbar {
     width: 8px;

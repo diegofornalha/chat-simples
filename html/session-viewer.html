@@ -34,6 +34,17 @@
                 </label>
             </div>
             <div id="messages" class="messages"></div>
+            <div id="typing-indicator" class="typing-indicator" style="display: none;">
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <div class="typing-info">
+                    <span class="typing-text">Claude está processando...</span>
+                    <span id="response-timer" class="response-timer">0.0s</span>
+                </div>
+            </div>
         </div>
 
         <div class="input-container">
@@ -77,6 +88,31 @@
             return escapeHtml(text).replace(/\n/g, '<br>');
         }
 
+        function sanitizeHtml(html) {
+            if (!html) return '';
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            doc.querySelectorAll('script, iframe, object, embed, link, style').forEach(el => el.remove());
+
+            doc.body.querySelectorAll('*').forEach(el => {
+                Array.from(el.attributes).forEach(attr => {
+                    const name = attr.name.toLowerCase();
+                    const value = (attr.value || '').trim().toLowerCase();
+                    if (name.startsWith('on') || value.startsWith('javascript:')) {
+                        el.removeAttribute(attr.name);
+                    }
+                });
+            });
+
+            return doc.body.innerHTML;
+        }
+
+        function renderMarkdownSafe(text) {
+            const raw = renderMarkdown(text);
+            return sanitizeHtml(raw);
+        }
+
         function enhanceCodeBlocks(root) {
             if (!root) return;
 
@@ -116,6 +152,7 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const SESSION_ID = urlParams.get('session_id');
+        let toolbarInitialized = false;
 
         if (!SESSION_ID) {
             document.body.innerHTML = '<p style="padding:3rem;text-align:center">❌ Session ID missing. Use: ?session_id=...</p>';
@@ -147,6 +184,7 @@
 
                 infoLog.innerHTML = '<div class="debug-entry debug-entry-info"><span class="debug-time">ID</span><span class="debug-icon">📝</span><span class="debug-msg">' + sessionId + '</span></div><div class="debug-entry debug-entry-info"><span class="debug-time">Model</span><span class="debug-icon">🤖</span><span class="debug-msg">' + model + '</span></div><div class="debug-entry debug-entry-success"><span class="debug-time">Count</span><span class="debug-icon">💬</span><span class="debug-msg">' + data.count + ' mensagens</span></div>';
 
+                initializeToolbar(container);
                 renderSessionEntries(container, data.messages);
 
                 container.scrollTop = container.scrollHeight;
@@ -154,6 +192,29 @@
             } catch (err) {
                 container.innerHTML = '<p style="text-align:center;padding:3rem;color:#ef4444">❌ Erro: ' + err.message + '</p>';
             }
+        }
+
+        function initializeToolbar(container) {
+            if (toolbarInitialized) return;
+
+            const summaryToggle = document.getElementById('toggle-summary');
+            const systemToggle = document.getElementById('toggle-system');
+
+            if (summaryToggle) {
+                container.classList.toggle('hide-summaries', !summaryToggle.checked);
+                summaryToggle.addEventListener('change', () => {
+                    container.classList.toggle('hide-summaries', !summaryToggle.checked);
+                });
+            }
+
+            if (systemToggle) {
+                container.classList.toggle('hide-system', !systemToggle.checked);
+                systemToggle.addEventListener('change', () => {
+                    container.classList.toggle('hide-system', !systemToggle.checked);
+                });
+            }
+
+            toolbarInitialized = true;
         }
 
         function renderSessionEntries(container, entries) {
@@ -234,13 +295,8 @@
             const body = document.createElement('div');
             body.className = 'message-body';
 
-            if (role === 'assistant') {
-                body.innerHTML = renderMarkdown(text);
-                enhanceCodeBlocks(body);
-            } else {
-                body.textContent = text;
-                body.style.whiteSpace = 'pre-wrap';
-            }
+            body.innerHTML = renderMarkdownSafe(text);
+            enhanceCodeBlocks(body);
 
             content.appendChild(body);
             wrapper.append(header, content);
