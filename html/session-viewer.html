@@ -67,23 +67,7 @@
 
                 infoLog.innerHTML = '<div class="debug-entry debug-entry-info"><span class="debug-time">ID</span><span class="debug-icon">📝</span><span class="debug-msg">' + sessionId + '</span></div><div class="debug-entry debug-entry-info"><span class="debug-time">Model</span><span class="debug-icon">🤖</span><span class="debug-msg">' + model + '</span></div><div class="debug-entry debug-entry-success"><span class="debug-time">Count</span><span class="debug-icon">💬</span><span class="debug-msg">' + data.count + ' mensagens</span></div>';
 
-                data.messages.forEach(e => {
-                    if (e.type === 'summary') {
-                        const d = document.createElement('div');
-                        d.style.cssText = 'background:#fef3c7;border-left:3px solid #f59e0b;padding:1rem;margin:1rem 0;border-radius:8px;font-style:italic;color:#92400e';
-                        d.innerHTML = '📊 <strong>Summary:</strong> ' + e.summary;
-                        container.appendChild(d);
-                    } else if (e.type === 'user' || e.type === 'assistant') {
-                        const m = e.message;
-                        if (!m) return;
-                        let txt = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.filter(b => b.type === 'text').map(b => b.text).join('\\n') : '');
-                        const t = new Date(e.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-                        const d = document.createElement('div');
-                        d.className = 'message ' + e.type;
-                        d.innerHTML = '<div class="message-header"><strong>' + (e.type === 'user' ? '👤 Você' : '🤖 Claude') + '</strong><span class="timestamp">' + t + '</span></div><div class="message-content"><p style="white-space:pre-wrap">' + txt + '</p></div>';
-                        container.appendChild(d);
-                    }
-                });
+                renderSessionEntries(container, data.messages);
 
                 container.scrollTop = container.scrollHeight;
                 initWS(sessionId);
@@ -92,43 +76,318 @@
             }
         }
 
+        function renderSessionEntries(container, entries) {
+            container.innerHTML = '';
+            entries.forEach(entry => {
+                const card = buildSessionEntry(entry);
+                if (card) container.appendChild(card);
+            });
+        }
+
+        function buildSessionEntry(entry) {
+            if (!entry) return null;
+
+            if (entry.type === 'summary' || entry.summary) {
+                return createSummaryCard(entry);
+            }
+
+            const message = entry.message || entry;
+            const role = message?.role || entry.role;
+
+            if (role === 'user' || role === 'assistant') {
+                const text = extractMessageText(message);
+                if (!text) return null;
+                const timestamp = entry.timestamp || message.timestamp || message.createdAt;
+                return createMessageCard(role, text, timestamp);
+            }
+
+            return createSystemCard(entry);
+        }
+
+        function extractMessageText(message) {
+            if (!message) return '';
+
+            const content = message.content ?? message.text ?? '';
+
+            if (typeof content === 'string') {
+                return content.trim();
+            }
+
+            if (Array.isArray(content)) {
+                return content
+                    .filter(block => block && (block.type === 'text' || block.type === 'tool_result'))
+                    .map(block => (block.text || block.content || '').trim())
+                    .filter(Boolean)
+                    .join('\n');
+            }
+
+            if (typeof content === 'object' && content !== null) {
+                return (content.text || content.content || '').trim();
+            }
+
+            return '';
+        }
+
+        function createMessageCard(role, text, timestamp) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+
+            const name = document.createElement('strong');
+            name.textContent = role === 'user' ? '👤 Você' : '🤖 Claude';
+
+            const meta = document.createElement('div');
+            meta.className = 'message-meta';
+
+            const time = document.createElement('span');
+            time.className = 'timestamp';
+            time.textContent = formatTimestamp(timestamp, false);
+
+            meta.appendChild(time);
+            header.append(name, meta);
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const paragraph = document.createElement('p');
+            paragraph.style.whiteSpace = 'pre-wrap';
+            paragraph.textContent = text;
+
+            content.appendChild(paragraph);
+            wrapper.append(header, content);
+
+            return wrapper;
+        }
+
+        function createSummaryCard(entry) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'session-entry summary';
+
+            const header = document.createElement('div');
+            header.className = 'session-entry-header';
+
+            const title = document.createElement('div');
+            title.className = 'session-entry-title';
+            title.textContent = '📊 Resumo automático';
+
+            const meta = document.createElement('span');
+            meta.className = 'session-entry-meta';
+            meta.textContent = formatTimestamp(entry.timestamp, true);
+
+            header.append(title, meta);
+
+            const body = document.createElement('div');
+            body.className = 'session-entry-body';
+            body.textContent = entry.summary || '';
+
+            wrapper.append(header, body);
+            return wrapper;
+        }
+
+        function createSystemCard(entry) {
+            const wrapper = document.createElement('div');
+            const isError = detectError(entry);
+            wrapper.className = 'session-entry system' + (isError ? ' error' : '');
+
+            const header = document.createElement('div');
+            header.className = 'session-entry-header';
+
+            const title = document.createElement('div');
+            title.className = 'session-entry-title';
+            title.textContent = (isError ? '⚠️' : '🛠️') + ' ' + (deriveSystemTitle(entry) || 'Evento do sistema');
+
+            const meta = document.createElement('span');
+            meta.className = 'session-entry-meta';
+            meta.textContent = formatTimestamp(entry.timestamp || entry.message?.timestamp, true);
+
+            header.append(title, meta);
+
+            const body = document.createElement('div');
+            body.className = 'session-entry-body';
+
+            const pre = document.createElement('pre');
+            pre.textContent = truncate(JSON.stringify(entry, null, 2));
+
+            body.appendChild(pre);
+            wrapper.append(header, body);
+
+            return wrapper;
+        }
+
+        function deriveSystemTitle(entry) {
+            if (entry.type && entry.type !== 'message') return entry.type;
+            if (entry.message?.type && entry.message.type !== 'message') return entry.message.type;
+            if (entry.tool_use_id || entry.toolUseId) return 'tool_result';
+            if (entry.message?.content && Array.isArray(entry.message.content)) {
+                const block = entry.message.content.find(item => item?.type && item.type !== 'text');
+                if (block?.type) return block.type;
+            }
+            return entry.role || 'evento';
+        }
+
+        function detectError(entry) {
+            if (entry.type === 'error' || entry.level === 'error') return true;
+            if (entry.toolUseResult?.is_error) return true;
+            const serialized = JSON.stringify(entry).toLowerCase();
+            return serialized.includes('error') || serialized.includes('denied');
+        }
+
+        function truncate(text, max = 800) {
+            if (!text) return '';
+            return text.length > max ? text.slice(0, max) + '…' : text;
+        }
+
+        function formatTimestamp(value, includeDate) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return includeDate ? value : value;
+
+            if (includeDate) {
+                return date.toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            return date.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
         function initWS(sid) {
             const ws = new WebSocket('ws://localhost:8080/ws/chat');
             const input = document.getElementById('message-input');
             const btn = document.getElementById('send-button');
             const msgs = document.getElementById('messages');
 
+            let streamingState = null;
+            let chunkCount = 0;
+
             ws.onopen = () => window.debugVisual?.log('websocket', 'Conectado');
             ws.onmessage = (e) => {
                 const d = JSON.parse(e.data);
+
                 if (d.type === 'text_chunk') {
-                    let p = msgs.querySelector('.message.assistant:last-child .message-content p');
-                    if (!p) {
-                        const div = document.createElement('div');
-                        div.className = 'message assistant';
-                        div.innerHTML = '<div class="message-header"><strong>🤖 Claude</strong><span class="timestamp">' + new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</span></div><div class="message-content"><p></p></div>';
-                        msgs.appendChild(div);
-                        p = div.querySelector('p');
+                    if (!streamingState) {
+                        streamingState = createStreamingAssistantMessage(msgs);
                     }
-                    p.textContent += d.content;
+
+                    chunkCount += 1;
+
+                    streamingState.paragraph.textContent += d.content;
+                    streamingState.counter.textContent = 'Chunks: ' + chunkCount;
+                    streamingState.timestamp.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+
                     msgs.scrollTop = msgs.scrollHeight;
                 } else if (d.type === 'result') {
                     btn.disabled = false;
+
+                    if (!streamingState) {
+                        streamingState = createStreamingAssistantMessage(msgs);
+                    }
+
+                    if (d.content) {
+                        streamingState.paragraph.textContent = d.content;
+                    }
+
+                    if (streamingState.counter) {
+                        const label = chunkCount > 0 ? 'Chunks: ' + chunkCount + ' ✓' : 'Resposta completa';
+                        streamingState.counter.textContent = label;
+                    }
+
+                    streamingState.timestamp.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                    window.debugVisual?.log('result', JSON.stringify({ duration: d.duration_ms, cost: d.cost }));
+
+                    streamingState = null;
+                    chunkCount = 0;
+                } else if (d.type === 'error') {
+                    btn.disabled = false;
+                    window.debugVisual?.log('error', d.error || 'Erro no processamento');
+
+                    if (!streamingState) {
+                        streamingState = createStreamingAssistantMessage(msgs);
+                    }
+
+                    if (streamingState.counter) {
+                        streamingState.counter.textContent = 'Erro durante streaming';
+                        streamingState.counter.classList.add('error');
+                    }
+
+                    streamingState.paragraph.textContent += '\n[Erro] ' + (d.error || 'Falha desconhecida');
+                    streamingState.timestamp.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
                 }
+            };
+
+            ws.onclose = () => {
+                btn.disabled = false;
+                window.debugVisual?.log('websocket', 'Conexão encerrada');
+            };
+
+            ws.onerror = (err) => {
+                btn.disabled = false;
+                window.debugVisual?.log('websocket', 'Erro: ' + err.message);
             };
 
             btn.onclick = () => {
                 const msg = input.value.trim();
                 if (!msg) return;
-                const div = document.createElement('div');
-                div.className = 'message user';
-                div.innerHTML = '<div class="message-header"><strong>👤 Você</strong><span class="timestamp">' + new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</span></div><div class="message-content"><p>' + msg + '</p></div>';
-                msgs.appendChild(div);
+
+                const userMessage = createMessageCard('user', msg, new Date().toISOString());
+                msgs.appendChild(userMessage);
                 msgs.scrollTop = msgs.scrollHeight;
+
                 ws.send(JSON.stringify({ message: msg, session_id: sid }));
+
                 input.value = '';
                 btn.disabled = true;
+                chunkCount = 0;
+                streamingState = null;
             };
+        }
+
+        function createStreamingAssistantMessage(container) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message assistant';
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+
+            const name = document.createElement('strong');
+            name.textContent = '🤖 Claude';
+
+            const meta = document.createElement('div');
+            meta.className = 'message-meta';
+
+            const counter = document.createElement('span');
+            counter.className = 'chunk-counter';
+            counter.textContent = 'Chunks: 0';
+
+            const timestamp = document.createElement('span');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+
+            meta.append(counter, timestamp);
+            header.append(name, meta);
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const paragraph = document.createElement('p');
+            paragraph.style.whiteSpace = 'pre-wrap';
+
+            content.appendChild(paragraph);
+            wrapper.append(header, content);
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+
+            return { wrapper, paragraph, counter, timestamp };
         }
     </script>
 </body>
