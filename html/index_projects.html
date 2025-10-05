@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projetos - Claude Sessions</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <button id="debug-toggle-btn" class="debug-toggle-btn-top" title="Debug (Ctrl+D)">🔽</button>
+
+        <div id="debug-visual-panel" class="debug-visual-panel-top" style="display: none;">
+            <div class="debug-visual-header">
+                <h3>🔍 Debug Info</h3>
+            </div>
+            <div class="debug-visual-content" id="debug-visual-content">
+                <div class="debug-log"></div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div id="sessions-list" class="messages" style="padding: 1.5rem;"></div>
+        </div>
+    </div>
+
+    <script src="../js/debug-visual.js"></script>
+    <script>
+        window.addEventListener('load', async () => {
+            const container = document.getElementById('sessions-list');
+
+            try {
+                const response = await fetch('http://localhost:8080/sessions');
+                const data = await response.json();
+
+                window.debugVisual?.log('success', data.count + ' sessões encontradas');
+
+                if (data.sessions.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:#64748b;padding:3rem">Nenhuma sessão encontrada</p>';
+                    return;
+                }
+
+                data.sessions.forEach(session => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'background:white;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;margin-bottom:1rem;cursor:pointer;transition:all 0.2s';
+                    card.onmouseenter = () => card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    card.onmouseleave = () => card.style.boxShadow = 'none';
+                    
+                    const filePath = (session.file || '').replace(/\\/g, '/');
+                    const projectFolder = filePath.split('/').slice(-2, -1)[0] || 'Projeto desconhecido';
+                    const created = new Date(session.created_at).toLocaleString('pt-BR');
+                    const updated = new Date(session.updated_at).toLocaleString('pt-BR');
+
+                    card.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:1rem">
+                            <div>
+                                <h3 style="margin:0;font-size:1.1rem;color:#0f172a">🗂️ ${projectFolder}</h3>
+                                <p style="margin:0.25rem 0 0;color:#64748b;font-size:0.85rem">${session.file_name}</p>
+                            </div>
+                            <span style="background:#6366f1;color:white;padding:0.25rem 0.75rem;border-radius:12px;font-size:0.75rem;font-weight:600">${session.message_count} mensagens</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.8rem;color:#64748b">
+                            <div>🤖 ${session.model}</div>
+                            <div style="text-align:right">📅 ${updated}</div>
+                        </div>
+                    `;
+
+                    card.onclick = () => {
+                        window.location.href = 'session-viewer.html?session_id=' + session.session_id;
+                    };
+
+                    container.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error('Erro:', error);
+                window.debugVisual?.log('error', 'Falha ao carregar: ' + error.message);
+                container.innerHTML = '<p style="text-align:center;color:#ef4444;padding:3rem">❌ Erro ao carregar sessões</p>';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Session Viewer</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <button id="debug-toggle-btn" class="debug-toggle-btn-top" title="Session Info (Ctrl+D)">🔽</button>
+
+        <div id="debug-visual-panel" class="debug-visual-panel-top" style="display: none;">
+            <div class="debug-visual-header">
+                <h3 id="session-title">🔍 Session Info</h3>
+            </div>
+            <div class="debug-visual-content">
+                <div class="debug-log" id="session-info"></div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div id="messages" class="messages"></div>
+        </div>
+
+        <div class="input-container">
+            <textarea id="message-input" placeholder="Digite sua mensagem..." rows="1"></textarea>
+            <button id="send-button" class="send-button">
+                <span class="button-text">Enviar</span>
+                <span class="button-icon">➤</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="../js/debug-visual.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const SESSION_ID = urlParams.get('session_id');
+
+        if (!SESSION_ID) {
+            document.body.innerHTML = '<p style="padding:3rem;text-align:center">❌ Session ID missing. Use: ?session_id=...</p>';
+        } else {
+            loadSession(SESSION_ID);
+        }
+
+        async function loadSession(sessionId) {
+            const container = document.getElementById('messages');
+            const infoLog = document.getElementById('session-info');
+            const title = document.getElementById('session-title');
+
+            try {
+                const res = await fetch('http://localhost:8080/sessions/' + sessionId);
+                const data = await res.json();
+
+                if (data.error) {
+                    container.innerHTML = '<p style="text-align:center;padding:3rem;color:#ef4444">❌ ' + data.error + '</p>';
+                    return;
+                }
+
+                const model = data.messages.find(m => m.message?.model)?.message?.model || 'unknown';
+                title.textContent = '🔍 Session - ' + sessionId.substring(0, 8) + '...';
+                infoLog.innerHTML = '<div class="debug-entry debug-entry-info"><span class="debug-time">ID</span><span class="debug-icon">📝</span><span class="debug-msg">' + sessionId + '</span></div><div class="debug-entry debug-entry-info"><span class="debug-time">Model</span><span class="debug-icon">🤖</span><span class="debug-msg">' + model + '</span></div><div class="debug-entry debug-entry-success"><span class="debug-time">Count</span><span class="debug-icon">💬</span><span class="debug-msg">' + data.count + ' mensagens</span></div>';
+
+                data.messages.forEach(e => {
+                    if (e.type === 'summary') {
+                        const d = document.createElement('div');
+                        d.style.cssText = 'background:#fef3c7;border-left:3px solid #f59e0b;padding:1rem;margin:1rem 0;border-radius:8px;font-style:italic;color:#92400e';
+                        d.innerHTML = '📊 <strong>Summary:</strong> ' + e.summary;
+                        container.appendChild(d);
+                    } else if (e.type === 'user' || e.type === 'assistant') {
+                        const m = e.message;
+                        if (!m) return;
+                        let txt = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.filter(b => b.type === 'text').map(b => b.text).join('\\n') : '');
+                        const t = new Date(e.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                        const d = document.createElement('div');
+                        d.className = 'message ' + e.type;
+                        d.innerHTML = '<div class="message-header"><strong>' + (e.type === 'user' ? '👤 Você' : '🤖 Claude') + '</strong><span class="timestamp">' + t + '</span></div><div class="message-content"><p style="white-space:pre-wrap">' + txt + '</p></div>';
+                        container.appendChild(d);
+                    }
+                });
+
+                container.scrollTop = container.scrollHeight;
+                initWS(sessionId);
+            } catch (err) {
+                container.innerHTML = '<p style="text-align:center;padding:3rem;color:#ef4444">❌ Erro: ' + err.message + '</p>';
+            }
+        }
+
+        function initWS(sid) {
+            const ws = new WebSocket('ws://localhost:8080/ws/chat');
+            const input = document.getElementById('message-input');
+            const btn = document.getElementById('send-button');
+            const msgs = document.getElementById('messages');
+
+            ws.onopen = () => window.debugVisual?.log('websocket', 'Conectado');
+            ws.onmessage = (e) => {
+                const d = JSON.parse(e.data);
+                if (d.type === 'text_chunk') {
+                    let p = msgs.querySelector('.message.assistant:last-child .message-content p');
+                    if (!p) {
+                        const div = document.createElement('div');
+                        div.className = 'message assistant';
+                        div.innerHTML = '<div class="message-header"><strong>🤖 Claude</strong><span class="timestamp">' + new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</span></div><div class="message-content"><p></p></div>';
+                        msgs.appendChild(div);
+                        p = div.querySelector('p');
+                    }
+                    p.textContent += d.content;
+                    msgs.scrollTop = msgs.scrollHeight;
+                } else if (d.type === 'result') {
+                    btn.disabled = false;
+                }
+            };
+
+            btn.onclick = () => {
+                const msg = input.value.trim();
+                if (!msg) return;
+                const div = document.createElement('div');
+                div.className = 'message user';
+                div.innerHTML = '<div class="message-header"><strong>👤 Você</strong><span class="timestamp">' + new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</span></div><div class="message-content"><p>' + msg + '</p></div>';
+                msgs.appendChild(div);
+                msgs.scrollTop = msgs.scrollHeight;
+                ws.send(JSON.stringify({ message: msg, session_id: sid }));
+                input.value = '';
+                btn.disabled = true;
+            };
+        }
+    </script>
+</body>
+</html>
