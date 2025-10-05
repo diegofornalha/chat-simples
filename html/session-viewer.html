@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <title>Session Viewer</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -20,6 +23,16 @@
         </div>
 
         <div class="chat-container">
+            <div class="session-toolbar">
+                <label class="toolbar-toggle">
+                    <input type="checkbox" id="toggle-summary" checked>
+                    <span>Mostrar resumos</span>
+                </label>
+                <label class="toolbar-toggle">
+                    <input type="checkbox" id="toggle-system" checked>
+                    <span>Mostrar eventos do sistema</span>
+                </label>
+            </div>
             <div id="messages" class="messages"></div>
         </div>
 
@@ -34,6 +47,73 @@
 
     <script src="../js/debug-visual.js"></script>
     <script>
+        if (window.marked) {
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                highlight(code, lang) {
+                    if (window.hljs) {
+                        if (lang && hljs.getLanguage(lang)) {
+                            return hljs.highlight(code, { language: lang }).value;
+                        }
+                        return hljs.highlightAuto(code).value;
+                    }
+                    return code;
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return '';
+            if (window.marked) {
+                return marked.parse(text);
+            }
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        }
+
+        function enhanceCodeBlocks(root) {
+            if (!root) return;
+
+            root.querySelectorAll('pre code').forEach(codeEl => {
+                if (window.hljs) {
+                    hljs.highlightElement(codeEl);
+                }
+
+                const text = codeEl.textContent || '';
+                const lines = text.split('\n').filter(Boolean).length;
+                const shouldCollapse = lines > 12 || text.length > 800;
+
+                if (shouldCollapse) {
+                    const pre = codeEl.parentElement;
+                    if (!pre) return;
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block';
+
+                    const toggle = document.createElement('button');
+                    toggle.type = 'button';
+                    toggle.className = 'code-toggle';
+                    toggle.textContent = 'Ver código completo';
+
+                    pre.classList.add('collapsible');
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(pre);
+                    wrapper.appendChild(toggle);
+
+                    toggle.addEventListener('click', () => {
+                        const expanded = pre.classList.toggle('expanded');
+                        toggle.textContent = expanded ? 'Ocultar código' : 'Ver código completo';
+                    });
+                }
+            });
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const SESSION_ID = urlParams.get('session_id');
 
@@ -151,11 +231,18 @@
             const content = document.createElement('div');
             content.className = 'message-content';
 
-            const paragraph = document.createElement('p');
-            paragraph.style.whiteSpace = 'pre-wrap';
-            paragraph.textContent = text;
+            const body = document.createElement('div');
+            body.className = 'message-body';
 
-            content.appendChild(paragraph);
+            if (role === 'assistant') {
+                body.innerHTML = renderMarkdown(text);
+                enhanceCodeBlocks(body);
+            } else {
+                body.textContent = text;
+                body.style.whiteSpace = 'pre-wrap';
+            }
+
+            content.appendChild(body);
             wrapper.append(header, content);
 
             return wrapper;
@@ -180,7 +267,8 @@
 
             const body = document.createElement('div');
             body.className = 'session-entry-body';
-            body.textContent = entry.summary || '';
+            body.innerHTML = renderMarkdown(entry.summary || '');
+            enhanceCodeBlocks(body);
 
             wrapper.append(header, body);
             return wrapper;
