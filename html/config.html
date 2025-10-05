@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - Claude Chat</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script>
+        (function() {
+            try {
+                const stored = localStorage.getItem('claude_chat_theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const theme = stored || (prefersDark ? 'dark' : 'light');
+                document.documentElement.dataset.theme = theme;
+            } catch (err) {
+                console.warn('Theme init error', err);
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <button id="debug-toggle-btn" class="debug-toggle-btn-top" title="Debug Visual (Ctrl+D)"><span class="debug-toggle-icon">☰</span></button>
+
+        <div id="debug-visual-panel" class="debug-visual-panel-top" style="display: none;">
+            <div class="debug-visual-header">
+                <h3>Configurações</h3>
+                <a class="debug-header-link" href="index.html" title="Voltar para o chat">⟲ Chat</a>
+            </div>
+            <div class="debug-visual-content">
+                <div class="debug-log"></div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="messages" style="padding: 1.5rem; gap: 1.5rem;">
+                <div class="message assistant">
+                    <div class="message-header">
+                        <strong>⚙️ Preferências de Visualização</strong>
+                    </div>
+                    <div class="message-content">
+                        <p>Ative ou desative elementos do visualizador de sessões:</p>
+                        <div class="session-toolbar" style="margin-top: 1rem;">
+                            <label class="toolbar-toggle">
+                                <input type="checkbox" id="toggle-summary" checked>
+                                <span>Mostrar resumos</span>
+                            </label>
+                            <label class="toolbar-toggle">
+                                <input type="checkbox" id="toggle-system" checked>
+                                <span>Mostrar eventos do sistema</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/debug-visual.js"></script>
+</body>
+</html>
