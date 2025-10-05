@@ -44,6 +44,8 @@ class DebugVisual {
                 : '<span class="debug-toggle-icon">☰</span>';
             btn.title = this.isOpen ? 'Fechar Debug (Ctrl+D)' : 'Debug Visual (Ctrl+D)';
         }
+
+        requestAnimationFrame(() => this.updateLayoutOffset());
     }
 
     close() {
@@ -52,6 +54,20 @@ class DebugVisual {
         if (panel) {
             panel.style.display = 'none';
         }
+        this.updateLayoutOffset();
+    }
+
+    updateLayoutOffset() {
+        const panel = document.getElementById('debug-visual-panel');
+        let offset = 0;
+
+        if (this.isOpen && panel) {
+            const panelHeight = panel.offsetHeight;
+            const extraGap = 16; // espaçamento visual entre painel e conteúdo
+            offset = panelHeight + extraGap;
+        }
+
+        document.documentElement.style.setProperty('--sticky-offset', `${offset}px`);
     }
 
     log(level, message, data = null) {
@@ -333,4 +349,5 @@ document.head.appendChild(debugVisualStyleElement);
 // Inicializar
 window.addEventListener('load', () => {
     window.debugVisual = new DebugVisual();
+    window.debugVisual.updateLayoutOffset();
 });

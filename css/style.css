@@ -176,6 +176,85 @@ body {
     z-index: 3;
 }
 
+.selection-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--toolbar-border);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.selection-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.selection-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.selection-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.selection-btn.secondary {
+    background: rgba(148, 163, 184, 0.15);
+    border-color: rgba(148, 163, 184, 0.3);
+    color: var(--text-secondary);
+}
+
+.selection-btn.danger {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--error);
+}
+
+.selection-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.selection-toolbar.loading,
+.selection-toolbar.loading .selection-btn {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+:root[data-theme="dark"] .selection-btn {
+    background: rgba(30, 41, 59, 0.7);
+}
+
+:root[data-theme="dark"] .selection-btn.danger {
+    background: rgba(248, 113, 113, 0.18);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: #fecaca;
+}
+
 .toolbar-left,
 .toolbar-right {
     display: flex;
@@ -293,6 +372,16 @@ body {
     display: none;
 }
 
+.selected-entry {
+    outline: 2px solid rgba(99, 102, 241, 0.35);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+}
+
+:root[data-theme="dark"] .selected-entry {
+    outline-color: rgba(129, 140, 248, 0.45);
+    box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.12);
+}
+
 /* Scrollbar customizada */
 .messages::-webkit-scrollbar {
     width: 8px;
@@ -386,6 +475,60 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.entry-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-left: auto;
+}
+
+.entry-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.entry-select-label {
+    font-weight: 500;
+}
+
+.entry-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.entry-action-btn {
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary);
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.entry-action-btn:hover {
+    background: rgba(99, 102, 241, 0.22);
+}
+
+.entry-action-btn.delete {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: var(--error);
+}
+
+.entry-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .timestamp {

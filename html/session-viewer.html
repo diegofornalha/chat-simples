@@ -35,6 +35,16 @@
         </div>
 
         <div class="chat-container">
+            <div id="selection-toolbar" class="selection-toolbar" style="display: none;">
+                <div class="selection-info">
+                    <span id="selection-count">Nenhuma mensagem selecionada</span>
+                </div>
+                <div class="selection-actions">
+                    <button id="select-all-btn" class="selection-btn">Selecionar tudo</button>
+                    <button id="clear-selection-btn" class="selection-btn secondary">Limpar seleção</button>
+                    <button id="delete-selected-btn" class="selection-btn danger">Excluir selecionadas</button>
+                </div>
+            </div>
             <div id="messages" class="messages"></div>
             <div id="typing-indicator" class="typing-indicator" style="display: none;">
                 <div class="typing-dots">
@@ -155,6 +165,39 @@
         const urlParams = new URLSearchParams(window.location.search);
         const SESSION_ID = urlParams.get('session_id');
         let toolbarInitialized = false;
+        let currentEntries = [];
+        let messagesContainer = null;
+        let deletingMessage = false;
+        const selectedEntries = new Set();
+
+        const selectionToolbar = document.getElementById('selection-toolbar');
+        const selectionCountEl = document.getElementById('selection-count');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const clearSelectionBtn = document.getElementById('clear-selection-btn');
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                selectAllEntries();
+            });
+        }
+
+        if (clearSelectionBtn) {
+            clearSelectionBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                selectedEntries.clear();
+                updateSelectionToolbar();
+                renderSessionEntries(messagesContainer, currentEntries);
+            });
+        }
+
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                deleteSelectedEntries();
+            });
+        }
 
         if (!SESSION_ID) {
             document.body.innerHTML = '<p style="padding:3rem;text-align:center">❌ Session ID missing. Use: ?session_id=...</p>';
@@ -166,6 +209,8 @@
             const container = document.getElementById('messages');
             const infoLog = document.getElementById('session-info');
             const title = document.getElementById('session-title');
+
+            messagesContainer = container;
 
             try {
                 const res = await fetch('http://localhost:8080/sessions/' + sessionId);
@@ -186,12 +231,20 @@
 
                 infoLog.innerHTML = '<div class="debug-entry debug-entry-info"><span class="debug-time">ID</span><span class="debug-icon">📝</span><span class="debug-msg">' + sessionId + '</span></div><div class="debug-entry debug-entry-info"><span class="debug-time">Model</span><span class="debug-icon">🤖</span><span class="debug-msg">' + model + '</span></div><div class="debug-entry debug-entry-success"><span class="debug-time">Count</span><span class="debug-icon">💬</span><span class="debug-msg">' + data.count + ' mensagens</span></div>';
 
+                selectedEntries.clear();
+                currentEntries = Array.isArray(data.messages)
+                    ? data.messages.map((entry, index) => normalizeEntry(entry, index))
+                    : [];
+
                 initializeToolbar(container);
-                renderSessionEntries(container, data.messages);
+                renderSessionEntries(container, currentEntries);
 
                 container.scrollTop = container.scrollHeight;
                 initWS(sessionId);
             } catch (err) {
+                selectedEntries.clear();
+                currentEntries = [];
+                updateSelectionToolbar();
                 container.innerHTML = '<p style="text-align:center;padding:3rem;color:#ef4444">❌ Erro: ' + err.message + '</p>';
             }
         }
@@ -220,18 +273,308 @@
         }
 
         function renderSessionEntries(container, entries) {
-            container.innerHTML = '';
-            entries.forEach(entry => {
-                const card = buildSessionEntry(entry);
-                if (card) container.appendChild(card);
+            const target = container || messagesContainer;
+            if (!target) return;
+
+            const previousScroll = target.scrollTop;
+            const isAtBottom = Math.abs(target.scrollHeight - (target.scrollTop + target.clientHeight)) < 4;
+
+            target.innerHTML = '';
+
+            if (!Array.isArray(entries) || !entries.length) {
+                updateSelectionToolbar();
+                return;
+            }
+
+            entries.forEach((entry, index) => {
+                const normalizedEntry = normalizeEntry(entry, index);
+                const card = buildSessionEntry(normalizedEntry, index);
+                if (!card) return;
+
+                const key = getEntryKey(normalizedEntry, index);
+                if (key && selectedEntries.has(key)) {
+                    card.classList.add('selected-entry');
+                }
+
+                card.dataset.entryIndex = index;
+                card.dataset.entryKey = key || '';
+                target.appendChild(card);
+            });
+
+            if (isAtBottom) {
+                target.scrollTop = target.scrollHeight;
+            } else {
+                target.scrollTop = Math.min(previousScroll, target.scrollHeight);
+            }
+
+            updateSelectionToolbar();
+        }
+
+        function normalizeEntry(entry, index) {
+            if (entry && typeof entry === 'object') {
+                entry.__lineIndex = index;
+            }
+            return entry;
+        }
+
+        function reindexCurrentEntries() {
+            if (!Array.isArray(currentEntries)) return;
+            currentEntries.forEach((entry, idx) => {
+                if (entry && typeof entry === 'object') {
+                    entry.__lineIndex = idx;
+                }
             });
         }
 
-        function buildSessionEntry(entry) {
+        function updateSelectionToolbar() {
+            if (!selectionToolbar || !selectionCountEl) return;
+
+            const total = Array.isArray(currentEntries) ? currentEntries.length : 0;
+            const selectedCount = selectedEntries.size;
+
+            if (!total) {
+                selectionToolbar.style.display = 'none';
+                selectionCountEl.textContent = 'Nenhuma mensagem disponível';
+                if (clearSelectionBtn) clearSelectionBtn.disabled = true;
+                if (deleteSelectedBtn) deleteSelectedBtn.disabled = true;
+                if (selectAllBtn) selectAllBtn.disabled = true;
+                return;
+            }
+
+            selectionToolbar.style.display = 'flex';
+            const plural = selectedCount === 1 ? '' : 's';
+            selectionCountEl.textContent = selectedCount
+                ? `${selectedCount} selecionada${plural} de ${total}`
+                : `${total} mensagens`;
+
+            if (clearSelectionBtn) {
+                clearSelectionBtn.disabled = selectedCount === 0 || deletingMessage;
+            }
+
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.disabled = selectedCount === 0 || deletingMessage;
+            }
+
+            if (selectAllBtn) {
+                selectAllBtn.disabled = deletingMessage;
+            }
+        }
+
+        function getEntryKey(entry, index) {
+            if (!entry || typeof entry !== 'object') {
+                return 'line:' + (index ?? 0);
+            }
+
+            const candidates = [
+                entry.messageId,
+                entry.id,
+                entry.uuid,
+                entry.tool_use_id,
+                entry.toolUseId
+            ];
+
+            const inner = entry.message;
+            if (inner && typeof inner === 'object') {
+                candidates.push(inner.id, inner.messageId);
+            }
+
+            for (const value of candidates) {
+                if (typeof value === 'string' && value.trim()) {
+                    return 'id:' + value.trim();
+                }
+            }
+
+            const lineIndex = entry.__lineIndex ?? index;
+            return 'line:' + (typeof lineIndex === 'number' ? lineIndex : 0);
+        }
+
+        function toggleEntrySelection(entry, index, shouldSelect) {
+            const key = getEntryKey(entry, index);
+            if (!key) return;
+
+            if (shouldSelect) {
+                selectedEntries.add(key);
+            } else {
+                selectedEntries.delete(key);
+            }
+
+            updateSelectionToolbar();
+        }
+
+        function selectAllEntries() {
+            if (!Array.isArray(currentEntries) || !currentEntries.length) return;
+
+            currentEntries.forEach((entry, index) => {
+                const key = getEntryKey(entry, index);
+                if (key) {
+                    selectedEntries.add(key);
+                }
+            });
+
+            updateSelectionToolbar();
+            renderSessionEntries(messagesContainer, currentEntries);
+        }
+
+        function buildDeletePayload(entry, index) {
+            const payload = {};
+            const messageId = extractEntryMessageId(entry);
+            if (messageId) {
+                payload.message_id = messageId;
+            }
+
+            const lineIndex = entry && typeof entry === 'object' && typeof entry.__lineIndex === 'number'
+                ? entry.__lineIndex
+                : index;
+
+            if (typeof lineIndex === 'number' && lineIndex >= 0) {
+                payload.line_index = lineIndex;
+            }
+
+            return payload;
+        }
+
+        async function performDeleteRequest(payload) {
+            const res = await fetch('http://localhost:8080/sessions/' + SESSION_ID + '/messages', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data?.error) {
+                throw new Error(data?.error || 'Falha ao remover mensagem.');
+            }
+
+            return data;
+        }
+
+        function cleanupAfterDeletion(entry, index) {
+            const key = getEntryKey(entry, index);
+            if (key) {
+                selectedEntries.delete(key);
+            }
+
+            let removeIndex = typeof index === 'number' ? index : -1;
+            if (removeIndex < 0 || removeIndex >= currentEntries.length || currentEntries[removeIndex] !== entry) {
+                removeIndex = currentEntries.indexOf(entry);
+            }
+
+            if (removeIndex === -1 && key) {
+                removeIndex = currentEntries.findIndex(item => getEntryKey(item) === key);
+            }
+
+            if (removeIndex !== -1) {
+                currentEntries.splice(removeIndex, 1);
+            }
+
+            reindexCurrentEntries();
+            renderSessionEntries(messagesContainer, currentEntries);
+        }
+
+        async function deleteEntry(entry, index, options = {}) {
+            if (!SESSION_ID) return false;
+
+            const { skipGuard = false, silent = false } = options;
+
+            if (deletingMessage && !skipGuard) {
+                return false;
+            }
+
+            const payload = buildDeletePayload(entry, index);
+
+            if (typeof payload.line_index !== 'number' && !payload.message_id) {
+                if (!silent) {
+                    console.error('Não foi possível identificar a entrada selecionada.');
+                }
+                return false;
+            }
+
+            if (!skipGuard) {
+                deletingMessage = true;
+                updateSelectionToolbar();
+            }
+
+            try {
+                await performDeleteRequest(payload);
+                cleanupAfterDeletion(entry, index);
+                window.debugVisual?.log('delete', 'Entrada removida: ' + (payload.message_id || ('linha ' + payload.line_index)));
+                return true;
+            } catch (err) {
+                const errorText = err?.message || 'Erro ao remover mensagem.';
+                console.error('Erro ao remover mensagem:', errorText, err);
+                window.debugVisual?.log('error', errorText, { payload, silent });
+                return false;
+            } finally {
+                if (!skipGuard) {
+                    deletingMessage = false;
+                    updateSelectionToolbar();
+                }
+            }
+        }
+
+        async function deleteSelectedEntries() {
+            if (!SESSION_ID) return;
+            if (selectedEntries.size === 0) return;
+            if (deletingMessage) return;
+
+            const total = selectedEntries.size;
+            window.debugVisual?.log('info', `Remoção em lote solicitada (${total} entradas).`);
+
+            deletingMessage = true;
+            updateSelectionToolbar();
+
+            if (selectionToolbar) {
+                selectionToolbar.classList.add('loading');
+            }
+
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.disabled = true;
+                deleteSelectedBtn.textContent = 'Removendo...';
+            }
+
+            let failures = 0;
+
+            const targets = currentEntries
+                .map((entry, index) => ({ entry, index, key: getEntryKey(entry, index) }))
+                .filter(item => selectedEntries.has(item.key));
+
+            for (const item of targets) {
+                const success = await deleteEntry(item.entry, item.index, { skipGuard: true, silent: true });
+                if (!success) {
+                    failures += 1;
+                }
+            }
+
+            selectedEntries.clear();
+            deletingMessage = false;
+
+            if (selectionToolbar) {
+                selectionToolbar.classList.remove('loading');
+            }
+
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.disabled = false;
+                deleteSelectedBtn.textContent = 'Excluir selecionadas';
+            }
+
+            if (failures > 0) {
+                window.debugVisual?.log('warning', `Falha ao remover ${failures} de ${targets.length} entradas.`);
+            } else {
+                window.debugVisual?.log('success', `Remoção em lote concluída (${targets.length} entradas).`);
+            }
+
+            updateSelectionToolbar();
+            renderSessionEntries(messagesContainer, currentEntries);
+        }
+
+        function buildSessionEntry(entry, index) {
             if (!entry) return null;
 
             if (entry.type === 'summary' || entry.summary) {
-                return createSummaryCard(entry);
+                return createSummaryCard(entry, index);
             }
 
             const message = entry.message || entry;
@@ -241,10 +584,10 @@
                 const text = extractMessageText(message);
                 if (!text) return null;
                 const timestamp = entry.timestamp || message.timestamp || message.createdAt;
-                return createMessageCard(role, text, timestamp);
+                return createMessageCard(role, text, timestamp, entry, index);
             }
 
-            return createSystemCard(entry);
+            return createSystemCard(entry, index);
         }
 
         function extractMessageText(message) {
@@ -271,7 +614,7 @@
             return '';
         }
 
-        function createMessageCard(role, text, timestamp) {
+        function createMessageCard(role, text, timestamp, entry, index) {
             const wrapper = document.createElement('div');
             wrapper.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
 
@@ -291,6 +634,9 @@
             meta.appendChild(time);
             header.append(name, meta);
 
+            const actions = createEntryActions(index, entry);
+            if (actions) header.appendChild(actions);
+
             const content = document.createElement('div');
             content.className = 'message-content';
 
@@ -306,7 +652,7 @@
             return wrapper;
         }
 
-        function createSummaryCard(entry) {
+        function createSummaryCard(entry, index) {
             const wrapper = document.createElement('div');
             wrapper.className = 'session-entry summary';
 
@@ -323,6 +669,9 @@
 
             header.append(title, meta);
 
+            const actions = createEntryActions(index, entry);
+            if (actions) header.appendChild(actions);
+
             const body = document.createElement('div');
             body.className = 'session-entry-body';
             body.innerHTML = renderMarkdown(entry.summary || '');
@@ -332,7 +681,7 @@
             return wrapper;
         }
 
-        function createSystemCard(entry) {
+        function createSystemCard(entry, index) {
             const wrapper = document.createElement('div');
             const isError = detectError(entry);
             wrapper.className = 'session-entry system' + (isError ? ' error' : '');
@@ -350,6 +699,9 @@
 
             header.append(title, meta);
 
+            const actions = createEntryActions(index, entry);
+            if (actions) header.appendChild(actions);
+
             const body = document.createElement('div');
             body.className = 'session-entry-body';
 
@@ -360,6 +712,111 @@
             wrapper.append(header, body);
 
             return wrapper;
+        }
+
+        function createEntryActions(index, entry) {
+            if (index == null || index < 0) return null;
+
+            const container = document.createElement('div');
+            container.className = 'entry-actions';
+
+            const selectWrapper = document.createElement('label');
+            selectWrapper.className = 'entry-select';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'entry-checkbox';
+
+            const key = getEntryKey(entry, index);
+            if (key && selectedEntries.has(key)) {
+                checkbox.checked = true;
+            }
+
+            checkbox.addEventListener('change', (event) => {
+                event.stopPropagation();
+                const shouldSelect = checkbox.checked;
+                toggleEntrySelection(entry, index, shouldSelect);
+                const card = event.currentTarget.closest('.message, .session-entry');
+                if (card) {
+                    card.classList.toggle('selected-entry', shouldSelect);
+                }
+            });
+
+            const selectLabel = document.createElement('span');
+            selectLabel.className = 'entry-select-label';
+            selectLabel.textContent = 'Selecionar';
+
+            selectWrapper.append(checkbox, selectLabel);
+            container.appendChild(selectWrapper);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'entry-action-btn delete';
+            deleteBtn.textContent = 'Excluir';
+            deleteBtn.disabled = deletingMessage;
+
+            deleteBtn.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const preview = getEntryPreview(entry);
+                window.debugVisual?.log('info', 'Solicitada remoção individual', { preview });
+
+                const originalLabel = deleteBtn.textContent;
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = 'Removendo...';
+
+                const success = await deleteEntry(entry, index);
+
+                if (!success) {
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = originalLabel;
+                } else {
+                    window.debugVisual?.log('success', 'Entrada removida com sucesso');
+                }
+            });
+
+            container.appendChild(deleteBtn);
+            return container;
+        }
+
+        function getEntryPreview(entry) {
+            try {
+                if (!entry) return 'Entrada sem detalhes.';
+
+                if (entry.summary) {
+                    return 'Resumo: ' + String(entry.summary).slice(0, 120);
+                }
+
+                if (entry.message) {
+                    const text = extractMessageText(entry.message);
+                    if (text) return text.slice(0, 120);
+                }
+
+                if (entry.content) {
+                    const text = Array.isArray(entry.content) ? entry.content.join(' ') : String(entry.content);
+                    if (text) return text.slice(0, 120);
+                }
+
+                return JSON.stringify(entry).slice(0, 120);
+            } catch (err) {
+                return 'Entrada selecionada.';
+            }
+        }
+
+        function extractEntryMessageId(entry) {
+            if (!entry) return null;
+
+            const candidates = [entry.messageId, entry.id, entry.uuid];
+
+            if (entry.message && typeof entry.message === 'object') {
+                candidates.push(entry.message.id, entry.message.messageId);
+            }
+
+            for (const value of candidates) {
+                if (typeof value === 'string' && value.trim()) {
+                    return value;
+                }
+            }
+            return null;
         }
 
         function deriveSystemTitle(entry) {
