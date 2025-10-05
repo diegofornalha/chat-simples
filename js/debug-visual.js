@@ -13,6 +13,8 @@ class DebugVisual {
         const toggleBtn = document.getElementById('debug-toggle-btn');
 
         if (toggleBtn) {
+            toggleBtn.innerHTML = '<span class="debug-toggle-icon">☰</span>';
+            toggleBtn.title = 'Debug Visual (Ctrl+D)';
             toggleBtn.onclick = () => this.toggle();
         }
 
@@ -37,7 +39,9 @@ class DebugVisual {
         }
 
         if (btn) {
-            btn.textContent = this.isOpen ? '🔼' : '🔽';
+            btn.innerHTML = this.isOpen
+                ? '<span class="debug-toggle-icon">×</span>'
+                : '<span class="debug-toggle-icon">☰</span>';
             btn.title = this.isOpen ? 'Fechar Debug (Ctrl+D)' : 'Debug Visual (Ctrl+D)';
         }
     }
@@ -112,25 +116,39 @@ class DebugVisual {
 const debugVisualStyles = `
     .debug-toggle-btn-top {
         position: fixed;
-        top: 10px;
-        right: 10px;
-        background: var(--primary);
+        top: 16px;
+        left: 16px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.55);
         color: white;
         border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-size: 0.9rem;
-        font-weight: 600;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 500;
         cursor: pointer;
         z-index: 10000;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+        backdrop-filter: blur(8px);
+        opacity: 0.65;
+        transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .debug-toggle-btn-top:hover {
-        background: var(--primary-dark);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+        opacity: 1;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+    }
+
+    .debug-toggle-icon {
+        display: inline-block;
+        font-size: 1.1rem;
+        line-height: 1;
+        letter-spacing: 1px;
+        font-weight: 600;
     }
 
     .debug-visual-panel-top {
@@ -176,12 +194,34 @@ const debugVisualStyles = `
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 1rem;
     }
 
     .debug-visual-header h3 {
         margin: 0;
         font-size: 1.1rem;
         font-weight: 600;
+    }
+
+    .debug-header-link {
+        background: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        color: white;
+        padding: 0.4rem 0.9rem;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+    }
+
+    .debug-header-link:hover {
+        background: rgba(255, 255, 255, 0.28);
+        transform: translateY(-1px);
     }
 
     #debug-visual-close {
