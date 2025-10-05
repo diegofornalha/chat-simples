@@ -302,7 +302,10 @@
                     }
 
                     streamingState.timestamp.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-                    window.debugVisual?.log('result', JSON.stringify({ duration: d.duration_ms, cost: d.cost }));
+
+                    if (typeof d.duration_ms !== 'undefined' || typeof d.cost !== 'undefined') {
+                        window.debugVisual?.log('result', JSON.stringify({ duration: d.duration_ms, cost: d.cost }));
+                    }
 
                     streamingState = null;
                     chunkCount = 0;
@@ -329,9 +332,9 @@
                 window.debugVisual?.log('websocket', 'Conexão encerrada');
             };
 
-            ws.onerror = (err) => {
+            ws.onerror = () => {
                 btn.disabled = false;
-                window.debugVisual?.log('websocket', 'Erro: ' + err.message);
+                window.debugVisual?.log('websocket', 'Erro na conexão WebSocket');
             };
 
             btn.onclick = () => {
