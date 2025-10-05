@@ -10,6 +10,18 @@
     <!-- Syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+        (function() {
+            try {
+                const stored = localStorage.getItem('claude_chat_theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const theme = stored || (prefersDark ? 'dark' : 'light');
+                document.documentElement.dataset.theme = theme;
+            } catch (err) {
+                console.warn('Theme init error', err);
+            }
+        })();
+    </script>
 </head>
 <body>
     <div class="container">
@@ -29,6 +41,16 @@
 
         <!-- Chat Container -->
         <div class="chat-container">
+            <div class="chat-toolbar">
+                <div class="toolbar-left">
+                    <button id="theme-toggle" class="toolbar-button" type="button" aria-label="Alternar tema">🌙</button>
+                    <a id="history-link" class="toolbar-link" href="index_projects.html" title="Ver histórico de sessões">📁 Histórico</a>
+                </div>
+                <div class="toolbar-right">
+                    <span id="message-count" class="toolbar-chip">0 mensagens</span>
+                    <span id="status" class="status-pill">🟡 Conectando…</span>
+                </div>
+            </div>
             <div id="messages" class="messages">
                 <!-- Mensagem de boas-vindas -->
                 <div class="message assistant">
@@ -70,12 +92,6 @@
             </button>
         </div>
 
-    </div>
-
-    <!-- Hidden counters for JS -->
-    <div style="display:none">
-        <span id="message-count">0</span>
-        <span id="status">connected</span>
     </div>
 
     <script src="../../js/debug.js"></script>
