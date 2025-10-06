@@ -131,52 +131,15 @@ class ClaudeChatApp {
     }
 
     setupTheme() {
-        try {
-            this.manualTheme = localStorage.getItem(THEME_KEY);
-        } catch (err) {
-            console.warn('Theme storage unavailable', err);
-        }
-
-        const prefersDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-        const initialTheme = this.manualTheme || (prefersDark && prefersDark.matches ? 'dark' : 'light');
-        this.setTheme(initialTheme, false);
-
-        if (prefersDark && prefersDark.addEventListener) {
-            prefersDark.addEventListener('change', (event) => {
-                if (!this.manualTheme) {
-                    this.setTheme(event.matches ? 'dark' : 'light', false);
-                }
-            });
-        }
-
-        if (this.themeToggle) {
-            this.themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
+        this.setTheme('light', false);
     }
 
     setTheme(theme, persist = true) {
         document.documentElement.dataset.theme = theme;
-        if (this.themeToggle) {
-            const isDark = theme === 'dark';
-            this.themeToggle.textContent = isDark ? '☀️' : '🌙';
-            this.themeToggle.setAttribute('aria-label', isDark ? 'Usar tema claro' : 'Usar tema escuro');
-        }
-
-        if (persist) {
-            try {
-                this.manualTheme = theme;
-                localStorage.setItem(THEME_KEY, theme);
-            } catch (err) {
-                console.warn('Failed to persist theme', err);
-            }
-        }
+        this.manualTheme = theme;
     }
 
-    toggleTheme() {
-        const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-        const next = current === 'dark' ? 'light' : 'dark';
-        this.setTheme(next, true);
-    }
+    toggleTheme() {}
 
     attachEvents() {
         if (this.sendButton) {

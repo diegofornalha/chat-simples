@@ -6,16 +6,7 @@
     <title>Projetos - Claude Sessions</title>
     <link rel="stylesheet" href="../css/style.css">
     <script>
-        (function() {
-            try {
-                const stored = localStorage.getItem('claude_chat_theme');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const theme = stored || (prefersDark ? 'dark' : 'light');
-                document.documentElement.dataset.theme = theme;
-            } catch (err) {
-                console.warn('Theme init error', err);
-            }
-        })();
+        document.documentElement.dataset.theme = 'light';
     </script>
 </head>
 <body>
@@ -25,6 +16,7 @@
         <div id="debug-visual-panel" class="debug-visual-panel-top" style="display: none;">
             <div class="debug-visual-header">
                 <h3>Debug Info</h3>
+                <a class="debug-header-link" href="index.html" title="Ir para o chat">⟲ Chat</a>
             </div>
             <div class="debug-visual-content" id="debug-visual-content">
                 <div class="debug-log"></div>

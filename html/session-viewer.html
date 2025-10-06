@@ -8,16 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script>
-        (function() {
-            try {
-                const stored = localStorage.getItem('claude_chat_theme');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const theme = stored || (prefersDark ? 'dark' : 'light');
-                document.documentElement.dataset.theme = theme;
-            } catch (err) {
-                console.warn('Theme init error', err);
-            }
-        })();
+        document.documentElement.dataset.theme = 'light';
     </script>
 </head>
 <body>
@@ -64,6 +55,9 @@
             <button id="send-button" class="send-button">
                 <span class="button-text">Enviar</span>
                 <span class="button-icon">➤</span>
+            </button>
+            <button id="refresh-button" class="send-button" style="margin-left: 0.5rem;" title="Atualizar página">
+                <span class="button-icon">🔄</span>
             </button>
         </div>
     </div>
@@ -170,6 +164,9 @@
         let deletingMessage = false;
         const selectedEntries = new Set();
 
+        let responseStartTime = null;
+        let responseTimerInterval = null;
+
         const selectionToolbar = document.getElementById('selection-toolbar');
         const selectionCountEl = document.getElementById('selection-count');
         const selectAllBtn = document.getElementById('select-all-btn');
@@ -196,6 +193,13 @@
             deleteSelectedBtn.addEventListener('click', (event) => {
                 event.preventDefault();
                 deleteSelectedEntries();
+            });
+        }
+
+        const refreshButton = document.getElementById('refresh-button');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', () => {
+                window.location.reload();
             });
         }
 
@@ -863,6 +867,64 @@
             });
         }
 
+        function showTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.style.display = 'flex';
+            }
+            startResponseTimer();
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.style.display = 'none';
+            }
+            stopResponseTimer();
+        }
+
+        function startResponseTimer() {
+            responseStartTime = Date.now();
+
+            if (responseTimerInterval) {
+                clearInterval(responseTimerInterval);
+            }
+
+            const timerElement = document.getElementById('response-timer');
+            responseTimerInterval = setInterval(() => {
+                const elapsed = (Date.now() - responseStartTime) / 1000;
+                if (timerElement) {
+                    timerElement.textContent = `${elapsed.toFixed(1)}s`;
+
+                    if (elapsed > 10) {
+                        timerElement.style.color = '#ef4444';
+                    } else if (elapsed > 5) {
+                        timerElement.style.color = '#f59e0b';
+                    } else {
+                        timerElement.style.color = '#10b981';
+                    }
+                }
+            }, 100);
+        }
+
+        function stopResponseTimer() {
+            if (responseTimerInterval) {
+                clearInterval(responseTimerInterval);
+                responseTimerInterval = null;
+            }
+
+            if (responseStartTime) {
+                const finalTime = Date.now() - responseStartTime;
+                window.debugVisual?.log('info', `Tempo de resposta: ${finalTime}ms`);
+            }
+
+            responseStartTime = null;
+            const timerElement = document.getElementById('response-timer');
+            if (timerElement) {
+                timerElement.style.color = '';
+            }
+        }
+
         function initWS(sid) {
             const ws = new WebSocket('ws://localhost:8080/ws/chat');
             const input = document.getElementById('message-input');
@@ -878,6 +940,7 @@
 
                 if (d.type === 'text_chunk') {
                     if (!streamingState) {
+                        hideTypingIndicator();
                         streamingState = createStreamingAssistantMessage(msgs);
                     }
 
@@ -889,6 +952,7 @@
 
                     msgs.scrollTop = msgs.scrollHeight;
                 } else if (d.type === 'result') {
+                    hideTypingIndicator();
                     btn.disabled = false;
 
                     if (!streamingState) {
@@ -913,6 +977,7 @@
                     streamingState = null;
                     chunkCount = 0;
                 } else if (d.type === 'error') {
+                    hideTypingIndicator();
                     btn.disabled = false;
                     window.debugVisual?.log('error', d.error || 'Erro no processamento');
 
@@ -954,6 +1019,8 @@
                 btn.disabled = true;
                 chunkCount = 0;
                 streamingState = null;
+
+                showTypingIndicator();
             };
         }
 
