@@ -58,7 +58,10 @@
                                 <h3>🗂️ ${projectFolder}</h3>
                                 <p class="session-card-subtitle">${session.file_name}</p>
                             </div>
-                            <span class="session-card-badge">${session.message_count} mensagens</span>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span class="session-card-badge">${session.message_count} mensagens</span>
+                                <button class="delete-session-btn" data-session-id="${session.session_id}" title="Deletar sessão">🗑️</button>
+                            </div>
                         </div>
                         <div class="session-card-meta">
                             <div>🤖 ${session.model}</div>
@@ -66,8 +69,39 @@
                         </div>
                     `;
 
-                    card.onclick = () => {
+                    card.onclick = (e) => {
+                        if (e.target.classList.contains('delete-session-btn')) {
+                            return;
+                        }
                         window.location.href = 'session-viewer.html?session_id=' + session.session_id;
+                    };
+
+                    const deleteBtn = card.querySelector('.delete-session-btn');
+                    deleteBtn.onclick = async (e) => {
+                        e.stopPropagation();
+
+                        if (!confirm(`Deletar sessão ${session.file_name}?`)) {
+                            return;
+                        }
+
+                        try {
+                            const response = await fetch(`http://localhost:8080/sessions/${session.session_id}`, {
+                                method: 'DELETE'
+                            });
+
+                            const result = await response.json();
+
+                            if (result.success) {
+                                window.debugVisual?.log('success', 'Sessão deletada: ' + session.file_name);
+                                card.remove();
+                            } else {
+                                window.debugVisual?.log('error', 'Erro ao deletar: ' + (result.error || 'Falha desconhecida'));
+                                alert('Erro ao deletar: ' + (result.error || 'Falha desconhecida'));
+                            }
+                        } catch (error) {
+                            window.debugVisual?.log('error', 'Erro: ' + error.message);
+                            alert('Erro ao deletar sessão: ' + error.message);
+                        }
                     };
 
                     container.appendChild(card);

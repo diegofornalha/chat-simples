@@ -1424,3 +1424,22 @@ body {
     border-color: var(--primary);
     transform: translateY(-2px);
 }
+
+/* Delete Session Button */
+.delete-session-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+}
+
+.delete-session-btn:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: white;
+    transform: scale(1.1);
+}
