@@ -80,10 +80,6 @@
                     deleteBtn.onclick = async (e) => {
                         e.stopPropagation();
 
-                        if (!confirm(`Deletar sessão ${session.file_name}?`)) {
-                            return;
-                        }
-
                         try {
                             const response = await fetch(`http://localhost:8080/sessions/${session.session_id}`, {
                                 method: 'DELETE'

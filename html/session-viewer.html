@@ -27,9 +27,6 @@
 
         <div class="chat-container">
             <div id="selection-toolbar" class="selection-toolbar" style="display: none;">
-                <div class="selection-info">
-                    <span id="selection-count">Nenhuma mensagem selecionada</span>
-                </div>
                 <div class="selection-actions">
                     <button id="select-all-btn" class="selection-btn">Selecionar tudo</button>
                     <button id="clear-selection-btn" class="selection-btn secondary">Limpar seleção</button>
@@ -168,7 +165,6 @@
         let responseTimerInterval = null;
 
         const selectionToolbar = document.getElementById('selection-toolbar');
-        const selectionCountEl = document.getElementById('selection-count');
         const selectAllBtn = document.getElementById('select-all-btn');
         const clearSelectionBtn = document.getElementById('clear-selection-btn');
         const deleteSelectedBtn = document.getElementById('delete-selected-btn');
@@ -331,14 +327,13 @@
         }
 
         function updateSelectionToolbar() {
-            if (!selectionToolbar || !selectionCountEl) return;
+            if (!selectionToolbar) return;
 
             const total = Array.isArray(currentEntries) ? currentEntries.length : 0;
             const selectedCount = selectedEntries.size;
 
             if (!total) {
                 selectionToolbar.style.display = 'none';
-                selectionCountEl.textContent = 'Nenhuma mensagem disponível';
                 if (clearSelectionBtn) clearSelectionBtn.disabled = true;
                 if (deleteSelectedBtn) deleteSelectedBtn.disabled = true;
                 if (selectAllBtn) selectAllBtn.disabled = true;
@@ -346,10 +341,6 @@
             }
 
             selectionToolbar.style.display = 'flex';
-            const plural = selectedCount === 1 ? '' : 's';
-            selectionCountEl.textContent = selectedCount
-                ? `${selectedCount} selecionada${plural} de ${total}`
-                : `${total} mensagens`;
 
             if (clearSelectionBtn) {
                 clearSelectionBtn.disabled = selectedCount === 0 || deletingMessage;
@@ -746,11 +737,7 @@
                 }
             });
 
-            const selectLabel = document.createElement('span');
-            selectLabel.className = 'entry-select-label';
-            selectLabel.textContent = 'Selecionar';
-
-            selectWrapper.append(checkbox, selectLabel);
+            selectWrapper.appendChild(checkbox);
             container.appendChild(selectWrapper);
 
             const deleteBtn = document.createElement('button');
