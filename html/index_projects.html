@@ -44,13 +44,24 @@
                     return;
                 }
 
-                data.sessions.forEach(session => {
+                // Detectar última sessão acessada via localStorage ou documento.referrer
+                const lastSessionId = localStorage.getItem('last_session_id');
+
+                data.sessions.forEach((session, index) => {
                     const card = document.createElement('div');
                     card.className = 'session-card';
-                    
+
+                    // Marcar sessão mais recente como ativa
+                    const isActive = index === 0;
+                    if (isActive) {
+                        card.classList.add('active-session');
+                    }
+
                     const filePath = (session.file || '').replace(/\\/g, '/');
                     const projectFolder = filePath.split('/').slice(-2, -1)[0] || 'Projeto desconhecido';
                     const updated = new Date(session.updated_at).toLocaleString('pt-BR');
+
+                    const activeBadge = isActive ? '<span class="active-badge">✨ Atual</span>' : '';
 
                     card.innerHTML = `
                         <div class="session-card-header">
@@ -59,6 +70,7 @@
                                 <p class="session-card-subtitle">${session.file_name}</p>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                ${activeBadge}
                                 <span class="session-card-badge">${session.message_count} mensagens</span>
                                 <button class="delete-session-btn" data-session-id="${session.session_id}" title="Deletar sessão">🗑️</button>
                             </div>

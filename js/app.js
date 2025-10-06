@@ -169,6 +169,11 @@ class ClaudeChatApp {
             newChatBtn.addEventListener('click', () => this.startNewChat());
         }
 
+        const refreshBtn = document.getElementById('refresh-button');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => window.location.reload());
+        }
+
         window.addEventListener('focus', () => {
             window.notificationSystem?.clearBadge();
         });
@@ -813,7 +818,10 @@ class ClaudeChatApp {
     }
 
     startNewChat() {
-        localStorage.clear();
+        // Limpar apenas o estado do chat no localStorage (não todo localStorage)
+        localStorage.removeItem('claude_chat_history');
+
+        // Recarregar página
         window.location.href = window.location.href.split('?')[0];
     }
 
