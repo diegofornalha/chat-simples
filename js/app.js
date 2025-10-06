@@ -164,6 +164,11 @@ class ClaudeChatApp {
             });
         }
 
+        const newChatBtn = document.getElementById('new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', () => this.startNewChat());
+        }
+
         window.addEventListener('focus', () => {
             window.notificationSystem?.clearBadge();
         });
@@ -255,14 +260,14 @@ class ClaudeChatApp {
         switch (state) {
             case 'connected':
                 this.statusIndicator.classList.add('connected');
-                this.statusIndicator.textContent = '🟢 Conectado';
+                this.statusIndicator.textContent = '🟢';
                 break;
             case 'connecting':
-                this.statusIndicator.textContent = '🟡 Conectando…';
+                this.statusIndicator.textContent = '🟡';
                 break;
             default:
                 this.statusIndicator.classList.add('disconnected');
-                this.statusIndicator.textContent = '⚫ Desconectado';
+                this.statusIndicator.textContent = '⚫';
                 break;
         }
     }
@@ -805,6 +810,11 @@ class ClaudeChatApp {
         this.messageCount = this.localHistory.length;
         this.updateMessageCount();
         this.scrollToBottom({ force: true, behavior: 'auto' });
+    }
+
+    startNewChat() {
+        localStorage.clear();
+        window.location.href = window.location.href.split('?')[0];
     }
 
     showTypingIndicator() {
