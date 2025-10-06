@@ -92,11 +92,9 @@
                                 card.remove();
                             } else {
                                 window.debugVisual?.log('error', 'Erro ao deletar: ' + (result.error || 'Falha desconhecida'));
-                                alert('Erro ao deletar: ' + (result.error || 'Falha desconhecida'));
                             }
                         } catch (error) {
-                            window.debugVisual?.log('error', 'Erro: ' + error.message);
-                            alert('Erro ao deletar sessão: ' + error.message);
+                            window.debugVisual?.log('error', 'Erro ao deletar sessão: ' + error.message);
                         }
                     };
 
