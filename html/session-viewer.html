@@ -597,13 +597,17 @@
             if (Array.isArray(content)) {
                 return content
                     .filter(block => block && (block.type === 'text' || block.type === 'tool_result'))
-                    .map(block => (block.text || block.content || '').trim())
+                    .map(block => {
+                        const content = block.text || block.content || '';
+                        return typeof content === 'string' ? content.trim() : '';
+                    })
                     .filter(Boolean)
                     .join('\n');
             }
 
             if (typeof content === 'object' && content !== null) {
-                return (content.text || content.content || '').trim();
+                const text = content.text || content.content || '';
+                return typeof text === 'string' ? text.trim() : '';
             }
 
             return '';
