@@ -13,24 +13,13 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
+            background: #f8fafc;
+            color: #1e293b;
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        header {
-            background: #16213e;
-            padding: 1rem;
-            text-align: center;
-            border-bottom: 1px solid #0f3460;
-        }
-
-        header h1 {
-            font-size: 1.5rem;
-            color: #e94560;
-        }
 
         #chat-container {
             flex: 1;
@@ -49,22 +38,24 @@
         }
 
         .user {
-            background: #0f3460;
+            background: #6366f1;
+            color: white;
             align-self: flex-end;
             border-bottom-right-radius: 0.25rem;
         }
 
         .assistant {
-            background: #16213e;
+            background: #ffffff;
             align-self: flex-start;
             border-bottom-left-radius: 0.25rem;
-            border: 1px solid #0f3460;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         #input-container {
             padding: 1rem;
-            background: #16213e;
-            border-top: 1px solid #0f3460;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
             display: flex;
             gap: 0.5rem;
         }
@@ -72,21 +63,22 @@
         #message-input {
             flex: 1;
             padding: 0.75rem 1rem;
-            border: 1px solid #0f3460;
+            border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
-            background: #1a1a2e;
-            color: #eee;
+            background: #f8fafc;
+            color: #1e293b;
             font-size: 1rem;
             outline: none;
         }
 
         #message-input:focus {
-            border-color: #e94560;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
         }
 
         #send-btn {
             padding: 0.75rem 1.5rem;
-            background: #e94560;
+            background: #6366f1;
             color: white;
             border: none;
             border-radius: 0.5rem;
@@ -96,11 +88,11 @@
         }
 
         #send-btn:hover {
-            background: #ff6b6b;
+            background: #4f46e5;
         }
 
         #send-btn:disabled {
-            background: #666;
+            background: #cbd5e1;
             cursor: not-allowed;
         }
 
@@ -108,7 +100,7 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 2px solid #fff;
+            border: 2px solid #6366f1;
             border-top-color: transparent;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -120,10 +112,6 @@
     </style>
 </head>
 <body>
-    <header>
-        <h1>🤖 Chat Simples - Hello Agent</h1>
-    </header>
-
     <div id="chat-container">
         <div class="message assistant">
             Olá! Sou o Hello Agent. Como posso ajudar?
