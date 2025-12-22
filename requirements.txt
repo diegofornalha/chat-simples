@@ -1,0 +1,6 @@
+# Backend
+fastapi
+uvicorn[standard]
+
+# Claude Agent SDK (usa CLI claude por baixo)
+claude-agent-sdk
