@@ -139,6 +139,47 @@
         }
         .loading-spinner .dots span:nth-child(2) { animation-delay: 0.2s; }
         .loading-spinner .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Audio Player */
+        .audio-player-block {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-top: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .audio-player-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .audio-player-header .audio-icon {
+            font-size: 1.1rem;
+        }
+        .audio-player-header .audio-filename {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        .audio-player-block audio {
+            width: 100%;
+            height: 36px;
+            border-radius: 8px;
+        }
+        .audio-player-block audio::-webkit-media-controls-panel {
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .audio-error {
+            font-size: 0.75rem;
+            color: var(--error);
+            padding: 0.25rem 0;
+        }
     </style>
 </head>
 <body>
@@ -232,6 +273,48 @@
             return cleaned.trim();
         }
 
+        function createAudioPlayer(filename) {
+            const block = document.createElement('div');
+            block.className = 'audio-player-block';
+
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'audio-player-header';
+
+            const icon = document.createElement('span');
+            icon.className = 'audio-icon';
+            icon.textContent = '\uD83C\uDFA7';  // headphones emoji
+
+            const fname = document.createElement('span');
+            fname.className = 'audio-filename';
+            fname.textContent = filename;
+
+            headerDiv.appendChild(icon);
+            headerDiv.appendChild(fname);
+
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.preload = 'none';
+            audio.src = `${API_URL}/audio/${encodeURIComponent(filename)}`;
+
+            audio.onerror = () => {
+                const err = document.createElement('div');
+                err.className = 'audio-error';
+                err.textContent = 'Arquivo de audio nao encontrado';
+                block.appendChild(err);
+            };
+
+            block.appendChild(headerDiv);
+            block.appendChild(audio);
+            return block;
+        }
+
+        // Detectar nomes de arquivos de audio em texto
+        function extractAudioFilename(text) {
+            if (!text) return null;
+            const match = text.match(/[\w\-]+\.(mp3|wav|ogg|m4a)/i);
+            return match ? match[0] : null;
+        }
+
         function createMessageElement(role, text, timestamp, extras = {}) {
             const wrapper = document.createElement('div');
             wrapper.className = `message ${role}`;
@@ -272,11 +355,18 @@
             }
 
             // Texto principal
-            if (text) {
+            const isAudioFilename = text && /^[\w\-]+\.(mp3|wav|ogg|m4a)$/i.test(text.trim());
+            if (text && !isAudioFilename) {
                 const body = document.createElement('div');
                 body.className = 'message-body';
                 body.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
                 content.appendChild(body);
+            }
+
+            // Audio player - por audio_file do backend ou nome de arquivo no texto
+            const audioFile = extras.audio_file || extras.audio_filename || (isAudioFilename ? text.trim() : null);
+            if (audioFile) {
+                content.appendChild(createAudioPlayer(audioFile));
             }
 
             // Tool calls
@@ -294,7 +384,6 @@
                     const argStr = typeof tc.arguments === 'string'
                         ? tc.arguments
                         : JSON.stringify(tc.arguments, null, 2);
-                    // Para exec/command, mostrar comando de forma limpa
                     if (tc.arguments && tc.arguments.command) {
                         tcArgs.textContent = truncateCommand(tc.arguments.command, 200);
                     } else {
@@ -353,12 +442,15 @@
                         ? cleanUserText(msg.text)
                         : msg.text;
 
-                    if (!displayText && !msg.tool_calls) continue;
+                    const hasAudio = msg.audio_file || msg.audio_filename;
+                    if (!displayText && !msg.tool_calls && !hasAudio) continue;
 
                     const el = createMessageElement(msg.role, displayText, msg.timestamp, {
                         model: msg.model,
                         thinking: msg.thinking,
                         tool_calls: msg.tool_calls,
+                        audio_file: msg.audio_file,
+                        audio_filename: msg.audio_filename,
                     });
                     messagesContainer.appendChild(el);
                 }

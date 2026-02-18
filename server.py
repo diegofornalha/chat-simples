@@ -35,6 +35,11 @@ SESSIONS_DIR = Path(os.environ.get(
     "/home/agents/.openclaw/agents/audio/sessions"
 ))
 
+AUDIO_DIRS = [
+    Path("/tmp/audio-studio"),
+    Path("/home/agents/.openclaw/media"),
+]
+
 # =============================================================================
 # APP FASTAPI
 # =============================================================================
@@ -92,20 +97,39 @@ def parse_session_jsonl(filepath: Path) -> dict:
 
             entries.append(entry)
 
-    # Extrair mensagens user/assistant legíveis
+    # Extrair mensagens user/assistant legíveis + referências de áudio
     messages = []
+    # Coletar áudios enviados via tool "message"
+    audio_files_sent = []  # [(timestamp, filepath)]
+
     for entry in entries:
         if entry.get("type") != "message":
             continue
 
         msg = entry.get("message", {})
         role = msg.get("role")
+
+        # Capturar áudios de toolResult do tool "message"
+        if role == "toolResult" and msg.get("toolName") == "message":
+            details = msg.get("details", {})
+            media_url = details.get("mediaUrl", "")
+            if media_url and any(media_url.endswith(ext) for ext in (".mp3", ".wav", ".ogg", ".m4a")):
+                audio_files_sent.append({
+                    "timestamp": entry.get("timestamp", ""),
+                    "filepath": media_url,
+                    "filename": Path(media_url).name,
+                    "target": details.get("to", ""),
+                })
+            continue
+
         if role not in ("user", "assistant"):
             continue
 
         content_blocks = msg.get("content", [])
         if isinstance(content_blocks, str):
             text = content_blocks.strip()
+            thinking = None
+            tool_calls = []
         elif isinstance(content_blocks, list):
             text_parts = []
             tool_calls = []
@@ -158,7 +182,25 @@ def parse_session_jsonl(filepath: Path) -> dict:
             if tool_calls:
                 message_data["tool_calls"] = tool_calls
 
+            # Detectar se o texto é um nome de arquivo de áudio
+            if text and any(text.strip().endswith(ext) for ext in (".mp3", ".wav", ".ogg")):
+                message_data["audio_filename"] = text.strip()
+
         messages.append(message_data)
+
+    # Enriquecer mensagens com áudios enviados (associar por proximidade temporal)
+    for audio_info in audio_files_sent:
+        audio_ts = audio_info["timestamp"]
+        # Encontrar a mensagem assistant mais próxima antes desse timestamp
+        best_msg = None
+        for m in messages:
+            if m["role"] != "assistant":
+                continue
+            if m["timestamp"] <= audio_ts:
+                best_msg = m
+        if best_msg and "audio_file" not in best_msg:
+            best_msg["audio_file"] = audio_info["filename"]
+            best_msg["audio_path"] = audio_info["filepath"]
 
     return {
         "session": session_info,
@@ -227,6 +269,37 @@ async def get_session(session_id: str):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/audio/{filename:path}")
+async def serve_audio(filename: str):
+    """Serve arquivos de áudio (.mp3, .wav) dos diretórios conhecidos."""
+    # Sanitizar: só o nome do arquivo, sem path traversal
+    safe_name = Path(filename).name
+    if not safe_name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Nome de arquivo inválido")
+
+    for audio_dir in AUDIO_DIRS:
+        filepath = audio_dir / safe_name
+        if filepath.exists() and filepath.is_file():
+            suffix = filepath.suffix.lower()
+            media_types = {
+                ".mp3": "audio/mpeg",
+                ".wav": "audio/wav",
+                ".ogg": "audio/ogg",
+                ".m4a": "audio/mp4",
+            }
+            media_type = media_types.get(suffix, "application/octet-stream")
+            return FileResponse(filepath, media_type=media_type)
+
+    # Tentar path absoluto se existir
+    abs_path = Path(filename)
+    if abs_path.exists() and abs_path.is_file():
+        suffix = abs_path.suffix.lower()
+        media_types = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".m4a": "audio/mp4"}
+        return FileResponse(abs_path, media_type=media_types.get(suffix, "application/octet-stream"))
+
+    raise HTTPException(status_code=404, detail=f"Áudio não encontrado: {safe_name}")
 
 
 @app.post("/chat", response_model=ChatResponse)
